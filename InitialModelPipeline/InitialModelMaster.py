@@ -9,19 +9,23 @@ class Project:
 
     def __init__(self):
         '''
-        Things needed for initialization:
-            Project folder
-                User settings
-                2DCs (with link to original file)
-                Inimodel (master folder of different inimodel runs with different settings)
-                    inimodel_1 --> log file of command, submission file
-                    inimodel_2
-                    ...
-                3DRefine
-                    3dr_1 --> log file of command, submission file
-                    3dr_2
-                    ...
+        - Initialize project folder
         '''
+
+        # Initialize constants
+        self.inimodel_settings = [
+            'inimodel_cpus',
+            'inimodel_crossover_range_min',
+            'inimodel_crossover_range_max',
+            'inimodel_crossover_step',
+            'inimodel_iter',
+            'inimodel_mask',
+            'inimodel_shift',
+            'inimodel_angle',
+            'inimodel_angle_step',
+            'inimodel_sym',
+            'inimodel_max_res'
+        ]
 
         # Initialize project folder
         self.workdir = os.getcwd()
@@ -51,7 +55,6 @@ class Project:
         self.classes_folder = os.path.join(self.projectdir, '2dclasses')
         self.inimodel_folder = os.path.join(self.projectdir, 'inimodel')
         self.refine_folder = os.path.join(self.projectdir, '3drefine')
-        self.archive_folder = os.path.join(self.projectdir, 'archive')
 
         if not self.is_exist:
             # Create project folder
@@ -96,7 +99,7 @@ class Project:
         if os.path.exists(self.settings_path):
             # Reading general settings
             print('Found user settings. Loading the following settings.')
-            self.read_settings()
+            self.read_settings(self.settings_path)
             print(self.settings)
         else:
             # Writing general settings
@@ -114,6 +117,7 @@ class Project:
             self.write_settings()
 
         # Check if job counters are present, if yes load them, if not write them
+        # SOON GOING TO BE OBSOLETE
         self.job_counter_path = os.path.join(self.settings_folder, 'job_counters.txt')
         self.job_counters = dict(
             inimodel_counter=0,
@@ -124,9 +128,34 @@ class Project:
         else:
             self.write_jobcounter()
 
+        # Create archive, store job information
+        # Important job information:
+        #   - Job folder location
+        #   - Job command log / settings
+        #   - Job status (pending, running, finished, failed)
+        # Implementation
+        #   - Write functions that create and read in archive information
+        #   - Internal saving of archive informations
+        #   - Archive
+        #       - Inimodel
+        #           - J1 --> Location, Setting, Status, Result --> create Job class!
+        #       - 3DR
+        #           - J1 --> Location, Setting, Status, Result --> Job class :)
+        #   - Archive is dictionary / list with all job objects
+
         # Eventually, create an archive to store jobs that have been completed
         # self.refine_jobs = dict()
         # self.inimodel_jobs = dict()
+
+        self.archive_path = os.path.join(self.settings_folder, 'archive.txt')
+        self.archive = dict(
+            inimodel_jobs=[],
+            refine_jobs=[]
+        )
+        if os.path.exists(self.archive_path):
+            self.read_archive()
+        else:
+            self.write_archive()
 
         # Check what to run
         self.get_job()
@@ -160,9 +189,9 @@ class Project:
         with open(self.settings_path, 'w') as fout:
             fout.write(output)
 
-    def read_settings(self):
+    def read_settings(self, settingsfile):
         # Reads settings found in the user_settings.txt
-        with open(self.settings_path) as fin:
+        with open(settingsfile) as fin:
             lines = fin.readlines()
             for line in lines:
                 key, value = line.strip().split('=')[0].strip(), line.strip().split('=')[1].strip()
@@ -225,6 +254,28 @@ class Project:
                 print(output)
                 fout.write(output)
 
+    def read_archive(self):
+        with open(self.archive_path) as fin:
+            lines = fin.readlines()
+            for line in lines:
+                jobtype, label, location, settings, log, status = line.strip().split(',')
+                if jobtype == 'INIMODEL':
+                    inimodel_job = Job(label, location, settings, log, status)
+                    self.archive['inimodel_jobs'].append(inimodel_job)
+                elif jobtype == 'REFINE':
+                    return
+        print('Loaded the following archive.')
+        print(self.archive)
+
+    def write_archive(self):
+        output = ''
+        with open(self.archive_path, 'w') as fout:
+            for inimodel_job in self.archive['inimodel_jobs']:
+                output += 'INIMODEL,' + str(inimodel_job) + '\n'
+            for refine_job in self.archive['refine_jobs']:
+                output += 'INIMODEL,' + str(refine_job) + '\n'
+            fout.write(output)
+
     # Initial model functions
     def inimodel(self):
         '''
@@ -266,33 +317,19 @@ class Project:
         #self.save_inimodel()
 
     def initialize_inimodel(self):
-        # Check if necessary settings are present, if not ask; if yes, confirm
-        # Then create new running-folder in inimodel folder, user counter & date for multiple runs
-        # Make sure to save inimodel_settings as log in that folder
-        inimodel_settings = [
-            'inimodel_cpus',
-            'inimodel_crossover_range_min',
-            'inimodel_crossover_range_max',
-            'inimodel_crossover_step',
-            'inimodel_iter',
-            'inimodel_mask',
-            'inimodel_shift',
-            'inimodel_angle',
-            'inimodel_angle_step',
-            'inimodel_sym',
-            'inimodel_max_res'
-        ]
         # Checking setting
-        for setting in inimodel_settings:
+        for setting in self.inimodel_settings:
             if self.settings[setting] == '':
                 print('Please specify ' + setting + ':')
                 self.settings[setting] = input('')
         self.write_settings()
+
         # Confirm settings
         print('Found the following initial model settings:')
-        for setting in inimodel_settings:
+        for setting in self.inimodel_settings:
             print(setting + ' = ' + str(self.settings[setting]))
         print('Modify settings in the settings file (' + self.settings_path + ')')
+
         # Create new inimodel folder for the run
         # Set folder name
         self.date = self.set_date()
@@ -302,6 +339,20 @@ class Project:
         # Create folder if it does not exist
         if not os.path.exists(self.inimodel_runs_master):
             os.mkdir(self.inimodel_runs_master)
+
+        # Write inimodel settings
+        self.write_inimodel_settings()
+
+        # Create job object and add it to the archive
+        # Create inimodel job
+        inimodel_job = Job(
+            label='inimodel_' + str(self.job_counters['inimodel_counter']),
+            location=self.inimodel_runs_master,
+            settingsfile=os.path.join(self.inimodel_runs_master, 'inimodel_settings.txt'),
+            logfile=os.path.join(self.inimodel_runs_master, 'command.log')
+        )
+        self.archive['inimodel_jobs'].append(inimodel_job)
+        self.write_archive()
         # Increase inimodel counter and save it
         self.job_counters['inimodel_counter'] += 1
         self.write_jobcounter()
@@ -374,11 +425,41 @@ class Project:
             cmd_string = 'sbatch ' + file
             subprocess.run(cmd_string, shell=True, text=True, check=True)
 
+    def write_inimodel_settings(self):
+        output = ''
+        filename = os.path.join(self.inimodel_runs_master, 'inimodel_settings.txt')
+        for setting in self.inimodel_settings:
+            output += '{} = {}'.format(setting, self.settings[setting]) + '\n'
+        with open(filename, 'w') as fout:
+            fout.write(output)
+
+    def read_inimodel_settings(self, settingsfile):
+        self.read_settings(settingsfile)
+
 
     def refine(self):
         return
 
 
+class Job():
+    '''
+    Job object for archiving job information.
+
+    TODO EVENTUALLY
+    Move inimodel functions of project here.
+    Including all necessary information such as lists of submission files etc.
+
+    '''
+    def __init__(self, label, location, settingsfile, logfile, status='WIP'):
+        self.label = label
+        self.location = location
+        self.settings_file = settingsfile
+        self.log_file = logfile
+        self.status = status
+
+    def __str__(self):
+        output = self.label + "," + self.location + "," + self.settings_file + "," + self.log_file + "," + self.status
+        return output
 
 
 if __name__ == '__main__':

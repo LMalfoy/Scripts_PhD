@@ -1,2 +1,0 @@
-inimodel_counter = 2
-refine_counter = 0

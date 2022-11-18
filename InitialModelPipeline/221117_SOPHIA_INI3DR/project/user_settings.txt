@@ -1,0 +1,14 @@
+general_ca_location = file.star
+general_ca_mrc_location = file.mrcs
+general_px_size = 1.9
+inimodel_angle = 1
+inimodel_angle_step = 1
+inimodel_cpus = 24
+inimodel_crossover_range_max = 10
+inimodel_crossover_range_min = 0
+inimodel_crossover_step = 5
+inimodel_iter = 10
+inimodel_mask = 200
+inimodel_max_res = 5
+inimodel_shift = 3
+inimodel_sym = 2

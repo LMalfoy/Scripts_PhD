@@ -1,0 +1,12 @@
+relion_helix_inimodel2d \
+--i file.star \
+--o 10co_initial_model \
+--angpix 1.9 \
+--iter 10 \
+--mask_diameter 200 \
+--search_shift 3 \
+--search_angle 1 \
+--step_angle 1 \
+--sym 2 \
+--maxres 5 \
+--j 24 

@@ -133,6 +133,7 @@ class Project:
         #   - Job folder location
         #   - Job command log / settings
         #   - Job status (pending, running, finished, failed)
+        #   - TODO job submission file location
         # Implementation
         #   - Write functions that create and read in archive information
         #   - Internal saving of archive informations
@@ -143,9 +144,6 @@ class Project:
         #           - J1 --> Location, Setting, Status, Result --> Job class :)
         #   - Archive is dictionary / list with all job objects
 
-        # Eventually, create an archive to store jobs that have been completed
-        # self.refine_jobs = dict()
-        # self.inimodel_jobs = dict()
 
         self.archive_path = os.path.join(self.settings_folder, 'archive.txt')
         self.archive = dict(

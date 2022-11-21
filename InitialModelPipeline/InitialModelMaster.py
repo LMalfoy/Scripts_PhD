@@ -27,6 +27,45 @@ class Project:
             'inimodel_max_res'
         ]
 
+        self.refine_settings = [
+            'refine_auto_refine',
+            'refine_split_random_halves',
+            'refine_particles',
+            'refine_reference',
+            'refine_ini_high',
+            'refine_dont_combine_weights_via_disc',
+            'refine_pool',
+            'refine_pad',
+            'refine_skip_gridding',
+            'refine_ctf',
+            'refine_particle_diameter',
+            'refine_flatten_solvent',
+            'refine_zero_mask',
+            'refine_oversampling',
+            'refine_healpix_order',
+            'refine_auto_local_healpix_order',
+            'refine_offset_range',
+            'refine_offset_step',
+            'refine_sym',
+            'refine_low_resol_join_halves',
+            'refine_norm',
+            'refine_scale',
+            'refine_helix',
+            'refine_helical_outer_diameter',
+            'refine_helical_nr_asu',
+            'refine_helical_twist_initial',
+            'refine_helical_rise_initial',
+            'refine_helical_z_percentage',
+            'refine_sigma_tilt',
+            'refine_sigma_psi',
+            'refine_sigma_rot',
+            'refine_helical_keep_tilt_prior_fixed',
+            'refine_thread',
+            'refine_gpu',
+            'refine_cpu',
+            'refine_taufudge'
+        ]
+
         # Initialize project folder
         self.workdir = os.getcwd()
         self.date = self.set_date()
@@ -89,9 +128,44 @@ class Project:
             inimodel_angle_step = 1,
             inimodel_sym = 2,
             inimodel_max_res = 5,
-            inimodel_cpus = 24
+            inimodel_cpus = 24,
             # 3DR settings
-            # WIP
+            refine_auto_refine = True,
+            refine_split_random_halves = True,
+            refine_particles = '',
+            refine_reference = '',
+            refine_ini_high = '',
+            refine_dont_combine_weights_via_disc = True,
+            refine_pool = 30,
+            refine_pad = '',
+            refine_skip_gridding = '',
+            refine_ctf = '',
+            refine_particle_diameter = '',
+            refine_flatten_solvent = '',
+            refine_zero_mask = '',
+            refine_oversampling = '',
+            refine_healpix_order = '',
+            refine_auto_local_healpix_order = '',
+            refine_offset_range = '',
+            refine_offset_step = '',
+            refine_sym = '',
+            refine_low_resol_join_halves = '',
+            refine_norm = '',
+            refine_scale = '',
+            refine_helix = '',
+            refine_helical_outer_diameter = '',
+            refine_helical_nr_asu = '',
+            refine_helical_twist_initial = '',
+            refine_helical_rise_initial = '',
+            refine_helical_z_percentage = '',
+            refine_sigma_tilt = '',
+            refine_sigma_psi = '',
+            refine_sigma_rot = '',
+            refine_helical_keep_tilt_prior_fixed = '',
+            refine_thread = '',
+            refine_gpu = '',
+            refine_cpu = '',
+            refine_taufudge = ''
         )
 
         # Check if user settings are present, if yes load them, if not write them
@@ -436,7 +510,94 @@ class Project:
 
 
     def refine(self):
+        # Get user settings
+        # Create necessary folders / files
+        # Write submission file
+        # Submit
+        # Add job & settings to archive
+        # Try to copy as much as code / routine as possible from inimodel pipeline
+        '''
+        # 3D REFINE COMMAND
+            mpirun `which relion_refine_mpi`\
+             --o Refine3D/900_3dref_result\
+             --auto_refine\
+             --split_random_halves\
+             --i Select/job043/particles.star\
+             --ref 220530_crossover_range_4refine/inimodels/bin3/900co_768px_bin3.mrc\
+             --ini_high 10\
+             --dont_combine_weights_via_disc\
+             --pool 30\
+             --pad 2\
+             --skip_gridding\
+             --ctf\
+             --particle_diameter 220\
+             --flatten_solvent\
+             --zero_mask\
+             --oversampling 1\
+             --healpix_order 3\
+             --auto_local_healpix_order 4\
+             --offset_range 5\
+             --offset_step 2\
+             --sym C1\
+             --low_resol_join_halves 40\
+             --norm\
+             --scale\
+             --helix\
+             --helical_outer_diameter 180\
+             --helical_nr_asu 3\
+             --helical_twist_initial -0.95\
+             --helical_rise_initial 4.75\
+             --helical_z_percentage 0.17\
+             --sigma_tilt 5\
+             --sigma_psi 3.33333\
+             --sigma_rot 0\
+             --helical_keep_tilt_prior_fixed\
+             --j 8\
+             --gpu "0:1:2:3"
+        '''
         return
+
+    def initialize_refine(self):
+        # Checking setting
+        for setting in self.refine_settings:
+            if self.settings[setting] == '':
+                print('Please specify ' + setting + ':')
+                self.settings[setting] = input('')
+        self.write_settings()
+
+        # Confirm settings
+        print('Found the following initial model settings:')
+        for setting in self.inimodel_settings:
+            print(setting + ' = ' + str(self.settings[setting]))
+        print('Modify settings in the settings file (' + self.settings_path + ')')
+
+        # Create new inimodel folder for the run
+        # Set folder name
+        self.date = self.set_date()
+        inimodel_runs_name = self.date + '_inimodel_' + self.settings['inimodel_crossover_range_min'] + \
+                             '_to_' + self.settings['inimodel_crossover_range_max'] + 'co_' + str(
+            self.job_counters['inimodel_counter'])
+        self.inimodel_runs_master = os.path.join(self.inimodel_folder, inimodel_runs_name)
+        # Create folder if it does not exist
+        if not os.path.exists(self.inimodel_runs_master):
+            os.mkdir(self.inimodel_runs_master)
+
+        # Write inimodel settings
+        self.write_inimodel_settings()
+
+        # Create job object and add it to the archive
+        # Create inimodel job
+        inimodel_job = Job(
+            label='inimodel_' + str(self.job_counters['inimodel_counter']),
+            location=self.inimodel_runs_master,
+            settingsfile=os.path.join(self.inimodel_runs_master, 'inimodel_settings.txt'),
+            logfile=os.path.join(self.inimodel_runs_master, 'command.log')
+        )
+        self.archive['inimodel_jobs'].append(inimodel_job)
+        self.write_archive()
+        # Increase inimodel counter and save it
+        self.job_counters['inimodel_counter'] += 1
+        self.write_jobcounter()
 
 
 class Job():

@@ -1,6 +1,8 @@
 import os
+import shutil
 import subprocess
 from datetime import date
+
 
 class Project:
     '''
@@ -13,6 +15,13 @@ class Project:
         '''
 
         # Initialize constants
+        self.job = None
+        self.inimodel_runs_master = None
+        self.refine_runs_master = None
+        self.inimodel_submission_file_paths = None
+        self.refine_submission_file_paths = None
+        self.inimodels_for_refine = None
+        self.co_selection = None
         self.inimodel_settings = [
             'inimodel_cpus',
             'inimodel_crossover_range_min',
@@ -26,7 +35,6 @@ class Project:
             'inimodel_sym',
             'inimodel_max_res'
         ]
-
         self.refine_settings = [
             'refine_auto_refine',
             'refine_split_random_halves',
@@ -60,16 +68,17 @@ class Project:
             'refine_sigma_psi',
             'refine_sigma_rot',
             'refine_helical_keep_tilt_prior_fixed',
-            'refine_thread',
+            'refine_mpis',
             'refine_gpu',
             'refine_cpu',
+            'refine_nodes',
+            'refine_mem_cpu',
             'refine_taufudge'
         ]
 
         # Initialize project folder
         self.workdir = os.getcwd()
         self.date = self.set_date()
-
         project_folders = self.find_project_folders()
         if len(project_folders) > 0:
             # List project folders, ask user which one to load
@@ -95,6 +104,7 @@ class Project:
         self.inimodel_folder = os.path.join(self.projectdir, 'inimodel')
         self.refine_folder = os.path.join(self.projectdir, '3drefine')
 
+        # Create folders if necessary
         if not self.is_exist:
             # Create project folder
             os.mkdir(self.project_folder)
@@ -114,58 +124,60 @@ class Project:
         # Check user settings
         self.settings = dict(
             # General settings
-            general_px_size = '',
-            general_ca_location = '',
-            general_ca_mrc_location = '',
+            general_px_size='',
+            general_ca_location='',
+            general_ca_mrc_location='',
             # Initial model settings
-            inimodel_crossover_range_min = '',
+            inimodel_crossover_range_min='',
             inimodel_crossover_range_max='',
-            inimodel_crossover_step = '',
-            inimodel_iter = 10,
-            inimodel_mask = 200,
-            inimodel_shift = 3,
-            inimodel_angle = 1,
-            inimodel_angle_step = 1,
-            inimodel_sym = 2,
-            inimodel_max_res = 5,
-            inimodel_cpus = 24,
+            inimodel_crossover_step='',
+            inimodel_iter=10,
+            inimodel_mask=200,
+            inimodel_shift=3,
+            inimodel_angle=1,
+            inimodel_angle_step=1,
+            inimodel_sym=2,
+            inimodel_max_res=5,
+            inimodel_cpus=24,
             # 3DR settings
-            refine_auto_refine = True,
-            refine_split_random_halves = True,
-            refine_particles = '',
-            refine_reference = '',
-            refine_ini_high = '',
-            refine_dont_combine_weights_via_disc = True,
-            refine_pool = 30,
-            refine_pad = '',
-            refine_skip_gridding = '',
-            refine_ctf = '',
-            refine_particle_diameter = '',
-            refine_flatten_solvent = '',
-            refine_zero_mask = '',
-            refine_oversampling = '',
-            refine_healpix_order = '',
-            refine_auto_local_healpix_order = '',
-            refine_offset_range = '',
-            refine_offset_step = '',
-            refine_sym = '',
-            refine_low_resol_join_halves = '',
-            refine_norm = '',
-            refine_scale = '',
-            refine_helix = '',
-            refine_helical_outer_diameter = '',
-            refine_helical_nr_asu = '',
-            refine_helical_twist_initial = '',
-            refine_helical_rise_initial = '',
-            refine_helical_z_percentage = '',
-            refine_sigma_tilt = '',
-            refine_sigma_psi = '',
-            refine_sigma_rot = '',
-            refine_helical_keep_tilt_prior_fixed = '',
-            refine_thread = '',
-            refine_gpu = '',
-            refine_cpu = '',
-            refine_taufudge = ''
+            refine_auto_refine=True,
+            refine_split_random_halves=True,
+            refine_particles='',
+            refine_reference='',
+            refine_ini_high='',
+            refine_dont_combine_weights_via_disc=True,
+            refine_pool=30,
+            refine_pad='',
+            refine_skip_gridding='',
+            refine_ctf='',
+            refine_particle_diameter='',
+            refine_flatten_solvent='',
+            refine_zero_mask='',
+            refine_oversampling='',
+            refine_healpix_order='',
+            refine_auto_local_healpix_order='',
+            refine_offset_range='',
+            refine_offset_step='',
+            refine_sym='',
+            refine_low_resol_join_halves='',
+            refine_norm='',
+            refine_scale='',
+            refine_helix='',
+            refine_helical_outer_diameter='',
+            refine_helical_nr_asu='',
+            refine_helical_twist_initial='',
+            refine_helical_rise_initial='',
+            refine_helical_z_percentage='',
+            refine_sigma_tilt='',
+            refine_sigma_psi='',
+            refine_sigma_rot='',
+            refine_helical_keep_tilt_prior_fixed='',
+            refine_mpis='',
+            refine_gpu='',
+            refine_cpu='',
+            refine_nodes='',
+            refine_mem_cpu=8000,
+            refine_taufudge=''
         )
 
         # Check if user settings are present, if yes load them, if not write them
@@ -188,10 +200,10 @@ class Project:
             self.settings["general_ca_location"] = input('Class average star file: ')
             self.settings["general_ca_mrc_location"] = self.settings["general_ca_location"][:-4] + 'mrcs'
             self.manipulate_ca_starfile()
+            self.create_link_to_ca_starfile()
             self.write_settings()
 
         # Check if job counters are present, if yes load them, if not write them
-        # SOON GOING TO BE OBSOLETE
         self.job_counter_path = os.path.join(self.settings_folder, 'job_counters.txt')
         self.job_counters = dict(
             inimodel_counter=0,
@@ -208,17 +220,6 @@ class Project:
         #   - Job command log / settings
         #   - Job status (pending, running, finished, failed)
         #   - TODO job submission file location
-        # Implementation
-        #   - Write functions that create and read in archive information
-        #   - Internal saving of archive informations
-        #   - Archive
-        #       - Inimodel
-        #           - J1 --> Location, Setting, Status, Result --> create Job class!
-        #       - 3DR
-        #           - J1 --> Location, Setting, Status, Result --> Job class :)
-        #   - Archive is dictionary / list with all job objects
-
-
         self.archive_path = os.path.join(self.settings_folder, 'archive.txt')
         self.archive = dict(
             inimodel_jobs=[],
@@ -232,6 +233,7 @@ class Project:
         # Check what to run
         self.get_job()
 
+        # Run what to run
         if self.job == "inimodel":
             self.inimodel()
         elif self.job == "refine":
@@ -309,6 +311,13 @@ class Project:
 
     def manipulate_ca_starfile(self):
         # Have to do this, since relion programs all need to be run from toplevel folder :l
+        # Create copy of original .star file
+        src = self.settings['general_ca_location']
+        dst = self.settings['general_ca_location'] + '_orig'
+        print('Creating copy of ' + src + 'as ' + dst)
+        shutil.copy2(src, dst)
+        # Manipulate original .star file
+        print('Manipulating original file so that general dir location usage is possible.')
         with open(self.settings['general_ca_location']) as fin:
             print(self.settings['general_ca_location'])
             lines = fin.readlines()
@@ -325,6 +334,14 @@ class Project:
                     output += line
                 print(output)
                 fout.write(output)
+
+    def create_link_to_ca_starfile(self):
+        # Create link to class average star file this project is based on
+        # Also create link to mrc stack
+        src = self.settings['general_ca_location']
+        dst = os.path.join(self.classes_folder, 'class_averages.star')
+        print('Creating link to class average file ' + src + ' as ' + dst)
+        os.symlink(src, dst)
 
     def read_archive(self):
         with open(self.archive_path) as fin:
@@ -345,8 +362,21 @@ class Project:
             for inimodel_job in self.archive['inimodel_jobs']:
                 output += 'INIMODEL,' + str(inimodel_job) + '\n'
             for refine_job in self.archive['refine_jobs']:
-                output += 'INIMODEL,' + str(refine_job) + '\n'
+                output += 'REFINE,' + str(refine_job) + '\n'
             fout.write(output)
+
+    def list_jobs(self, inimodel=False, refine=False):
+        if inimodel:
+            for i in range(len(self.archive['inimodel_jobs'])):
+                print(str(i) + '. ' + self.archive['inimodel_jobs'][i].label)
+        elif refine:
+            for i in range(len(self.archive['refine_jobs'])):
+                print(str(i) + '. ' + self.archive['refine_jobs'][i].label)
+        else:
+            print('Please speficy which jobs to list.')
+
+    def calc_twist(self, crossover):
+        return 4.75 * 180 / crossover
 
     # Initial model functions
     def inimodel(self):
@@ -386,7 +416,7 @@ class Project:
 
         # Submit submission files to hpc
         self.inimodel_submit()
-        #self.save_inimodel()
+        # self.save_inimodel()
 
     def initialize_inimodel(self):
         # Checking setting
@@ -406,7 +436,8 @@ class Project:
         # Set folder name
         self.date = self.set_date()
         inimodel_runs_name = self.date + '_inimodel_' + self.settings['inimodel_crossover_range_min'] + \
-            '_to_' + self.settings['inimodel_crossover_range_max'] + 'co_' + str(self.job_counters['inimodel_counter'])
+                             '_to_' + self.settings['inimodel_crossover_range_max'] + 'co_' + str(
+            self.job_counters['inimodel_counter'])
         self.inimodel_runs_master = os.path.join(self.inimodel_folder, inimodel_runs_name)
         # Create folder if it does not exist
         if not os.path.exists(self.inimodel_runs_master):
@@ -418,7 +449,7 @@ class Project:
         # Create job object and add it to the archive
         # Create inimodel job
         inimodel_job = Job(
-            label='inimodel_' + str(self.job_counters['inimodel_counter']),
+            label=inimodel_runs_name,
             location=self.inimodel_runs_master,
             settingsfile=os.path.join(self.inimodel_runs_master, 'inimodel_settings.txt'),
             logfile=os.path.join(self.inimodel_runs_master, 'command.log')
@@ -435,20 +466,20 @@ class Project:
         submissionstring = '#!/bin/bash -l' + '\n'
         submissionstring += '#SBATCH -D ' + directory + '/\n'
         submissionstring += '#SBATCH -J inimodel' + '\n'
-        submissionstring +='#SBATCH -C scratch' + '\n'
-        submissionstring +='#SBATCH --partition=medium' + '\n'
-        submissionstring +='#SBATCH --error=' + directory + '/inimodel_' + co + 'co.err' + '\n'
-        submissionstring +='#SBATCH --output=' + directory + '/inimodel_' + co + 'co.out' + '\n'
-        submissionstring +='#SBATCH --ntasks=' + str(self.settings['inimodel_cpus']) + '\n'
-        submissionstring +='#SBATCH -t 02:00:00' + '\n'
-        submissionstring +='#SBATCH --qos=short' + '\n'
+        submissionstring += '#SBATCH -C scratch' + '\n'
+        submissionstring += '#SBATCH --partition=medium' + '\n'
+        submissionstring += '#SBATCH --error=' + directory + '/inimodel_' + co + 'co.err' + '\n'
+        submissionstring += '#SBATCH --output=' + directory + '/inimodel_' + co + 'co.out' + '\n'
+        submissionstring += '#SBATCH --ntasks=' + str(self.settings['inimodel_cpus']) + '\n'
+        submissionstring += '#SBATCH -t 02:00:00' + '\n'
+        submissionstring += '#SBATCH --qos=short' + '\n'
         # Load relion module. Syntax might change in the future.
-        submissionstring +='module purge' + '\n'
-        submissionstring +='shopt -s expand_aliases' + '\n'
-        submissionstring +='source /usr/users/rubsak/sw/rubsak.bashrc' + '\n'
-        submissionstring +='use_relion4' + '\n'
-        submissionstring +='# load relion/4.0.0' + '\n'
-        submissionstring +='echo - e "$(hostname) modules: $(module list 2>&1 | grep relion --color=never)"' + '\n'
+        submissionstring += 'module purge' + '\n'
+        submissionstring += 'shopt -s expand_aliases' + '\n'
+        submissionstring += 'source /usr/users/rubsak/sw/rubsak.bashrc' + '\n'
+        submissionstring += 'use_relion4' + '\n'
+        submissionstring += '# load relion/4.0.0' + '\n'
+        submissionstring += 'echo - e "$(hostname) modules: $(module list 2>&1 | grep relion --color=never)"' + '\n'
         # Get & write initial model command
         submissionstring += self.write_inimodel_command(crossover)
         # Write submission file
@@ -460,7 +491,7 @@ class Project:
 
     def write_inimodel_command(self, crossover, inimodel_name=''):
         # Get values
-        iter = self.settings['inimodel_iter']
+        ini_iter = self.settings['inimodel_iter']
         mask = self.settings['inimodel_mask']
         shift = self.settings['inimodel_shift']
         angle = self.settings['inimodel_angle']
@@ -478,7 +509,7 @@ class Project:
         inimodel_command += '--i ' + class_averages + ' \\\n'
         inimodel_command += '--o ' + inimodel_name + ' \\\n'
         inimodel_command += '--angpix ' + str(px_size) + ' \\\n'
-        inimodel_command += '--iter ' + str(iter) + ' \\\n'
+        inimodel_command += '--iter ' + str(ini_iter) + ' \\\n'
         inimodel_command += '--mask_diameter ' + str(mask) + ' \\\n'
         inimodel_command += '--search_shift ' + str(shift) + ' \\\n'
         inimodel_command += '--search_angle ' + str(angle) + ' \\\n'
@@ -508,57 +539,60 @@ class Project:
     def read_inimodel_settings(self, settingsfile):
         self.read_settings(settingsfile)
 
+    # Refinement functions
 
     def refine(self):
-        # Get user settings
         # Create necessary folders / files
         # Write submission file
         # Submit
-        # Add job & settings to archive
-        # Try to copy as much as code / routine as possible from inimodel pipeline
-        '''
-        # 3D REFINE COMMAND
-            mpirun `which relion_refine_mpi`\
-             --o Refine3D/900_3dref_result\
-             --auto_refine\
-             --split_random_halves\
-             --i Select/job043/particles.star\
-             --ref 220530_crossover_range_4refine/inimodels/bin3/900co_768px_bin3.mrc\
-             --ini_high 10\
-             --dont_combine_weights_via_disc\
-             --pool 30\
-             --pad 2\
-             --skip_gridding\
-             --ctf\
-             --particle_diameter 220\
-             --flatten_solvent\
-             --zero_mask\
-             --oversampling 1\
-             --healpix_order 3\
-             --auto_local_healpix_order 4\
-             --offset_range 5\
-             --offset_step 2\
-             --sym C1\
-             --low_resol_join_halves 40\
-             --norm\
-             --scale\
-             --helix\
-             --helical_outer_diameter 180\
-             --helical_nr_asu 3\
-             --helical_twist_initial -0.95\
-             --helical_rise_initial 4.75\
-             --helical_z_percentage 0.17\
-             --sigma_tilt 5\
-             --sigma_psi 3.33333\
-             --sigma_rot 0\
-             --helical_keep_tilt_prior_fixed\
-             --j 8\
-             --gpu "0:1:2:3"
-        '''
-        return
+
+        # Select initial models to refine
+        self.load_inimodels()
+        # Initialize refinement settings, folders and archive
+        self.initialize_refine()
+        # For each loaded initial model, create subfolder & write submission file into it
+
+        self.refine_submission_file_paths = []
+        for co in self.co_selection:
+            refine_run_name = co + '_refine'
+            refine_run_folder = os.path.join(self.refine_runs_master, refine_run_name)
+            os.mkdir(refine_run_folder)
+            # Calculate twist
+            co = int(co[:-2])
+            submission_file = self.write_refine_submission(directory=refine_run_folder, crossover=co)
+            self.refine_submission_file_paths.append(submission_file)
+
+        # Submit jobs to the hpc
+        self.refine_submit()
+
+    def load_inimodels(self):
+        # List jobs from archive
+        self.list_jobs(inimodel=True)
+        selection = int(input("Please select INIMODEL job: "))
+        # Load settings of specified job
+        self.read_settings(self.archive['inimodel_jobs'][selection].settings_file)
+        # Ask user which models to load
+        self.inimodels_for_refine = []
+        co_range_string = ''
+        for i in range(int(self.settings['inimodel_crossover_range_min']),
+                       int(self.settings['inimodel_crossover_range_max']) +
+                       int(self.settings['inimodel_crossover_step']),
+                       int(self.settings['inimodel_crossover_step'])):
+            co_range_string += str(i) + ' '
+        print("Found the following crossover range: ")
+        print(co_range_string)
+        # Get user information, save initial model location in self.inimodels_for_refine
+        co_selection_string = input("Please specify which crossover models to choose " +
+                                    "for refinement (seperate multiple entries with a whitespace): ")
+        self.co_selection = [x + 'co' for x in co_selection_string.strip().split()]
+        for e in self.co_selection:
+            inimodel_file = os.path.join(self.archive['inimodel_jobs'][selection].location, e, e + '_initial_model.mrc')
+            self.inimodels_for_refine.append(inimodel_file)
 
     def initialize_refine(self):
         # Checking setting
+        # TODO refinement standard settings
+        # TODO refinement settings levels
         for setting in self.refine_settings:
             if self.settings[setting] == '':
                 print('Please specify ' + setting + ':')
@@ -566,49 +600,165 @@ class Project:
         self.write_settings()
 
         # Confirm settings
-        print('Found the following initial model settings:')
-        for setting in self.inimodel_settings:
+        print('Found the following refinement settings:')
+        for setting in self.refine_settings:
             print(setting + ' = ' + str(self.settings[setting]))
         print('Modify settings in the settings file (' + self.settings_path + ')')
 
-        # Create new inimodel folder for the run
+        # Create new refinement folder for the run
         # Set folder name
         self.date = self.set_date()
-        inimodel_runs_name = self.date + '_inimodel_' + self.settings['inimodel_crossover_range_min'] + \
-                             '_to_' + self.settings['inimodel_crossover_range_max'] + 'co_' + str(
-            self.job_counters['inimodel_counter'])
-        self.inimodel_runs_master = os.path.join(self.inimodel_folder, inimodel_runs_name)
+        refine_co_selection = '_'.join(self.co_selection)
+        refine_runs_name = self.date + '_3DR_' + refine_co_selection + '_' + str(
+            self.job_counters['refine_counter'])
+        self.refine_runs_master = os.path.join(self.refine_folder, refine_runs_name)
         # Create folder if it does not exist
-        if not os.path.exists(self.inimodel_runs_master):
-            os.mkdir(self.inimodel_runs_master)
+        if not os.path.exists(self.refine_runs_master):
+            os.mkdir(self.refine_runs_master)
 
-        # Write inimodel settings
-        self.write_inimodel_settings()
+        # Write refine settings
+        self.write_refine_settings()
 
         # Create job object and add it to the archive
         # Create inimodel job
-        inimodel_job = Job(
-            label='inimodel_' + str(self.job_counters['inimodel_counter']),
-            location=self.inimodel_runs_master,
-            settingsfile=os.path.join(self.inimodel_runs_master, 'inimodel_settings.txt'),
-            logfile=os.path.join(self.inimodel_runs_master, 'command.log')
+        refine_job = Job(
+            label=refine_runs_name,
+            location=self.refine_runs_master,
+            settingsfile=os.path.join(self.refine_runs_master, 'refine_settings.txt'),
+            logfile=os.path.join(self.refine_runs_master, 'command.log')
         )
-        self.archive['inimodel_jobs'].append(inimodel_job)
+        self.archive['refine_jobs'].append(refine_job)
         self.write_archive()
         # Increase inimodel counter and save it
-        self.job_counters['inimodel_counter'] += 1
+        self.job_counters['refine_counter'] += 1
         self.write_jobcounter()
+
+    def write_refine_settings(self):
+        output = ''
+        filename = os.path.join(self.refine_runs_master, 'refine_settings.txt')
+        for setting in self.refine_settings:
+            output += '{} = {}'.format(setting, self.settings[setting]) + '\n'
+        with open(filename, 'w') as fout:
+            fout.write(output)
+
+    def read_refine_settings(self, settingsfile):
+        self.read_settings(settingsfile)
+
+    def write_refine_submission(self, directory, crossover):
+        co = str(crossover)
+        twist = self.calc_twist(crossover)
+        # Build output string
+        submissionstring = '#!/bin/bash -l' + '\n'
+        submissionstring += '#SBATCH -D ' + directory + '/\n'
+        submissionstring += '#SBATCH -J refine' + '\n'
+        submissionstring += '#SBATCH -C scratch' + '\n'
+        submissionstring += '#SBATCH --partition=gpu' + '\n'
+        submissionstring += '#SBATCH --error=' + directory + '/refine_' + co + 'co.err' + '\n'
+        submissionstring += '#SBATCH --output=' + directory + '/refine_' + co + 'co.out' + '\n'
+        submissionstring += '# Ressource settings'
+        submissionstring += '#SBATCH --gres=gpu:' + str(self.settings['refine_gpu']) + '\n'
+        submissionstring += '#SBATCH --cpus-per-task=' + str(self.settings['refine_cpus']) + '\n'
+        submissionstring += '#SBATCH --nodes=' + str(self.settings['refine_nodes']) + '\n'
+        submissionstring += '#SBATCH --ntasks=' + str(self.settings['refine_mpis']) + '\n'
+        submissionstring += '#SBATCH --mem-per-cpu=' + str(self.settings['refine_mem_cpu']) + '\n'
+        submissionstring += '#SBATCH -t 48:00:00' + '\n'
+        # Load relion module. Syntax might change in the future.
+        submissionstring += 'module purge' + '\n'
+        submissionstring += 'shopt -s expand_aliases' + '\n'
+        submissionstring += 'source /usr/users/rubsak/sw/rubsak.bashrc' + '\n'
+        submissionstring += 'use_relion4' + '\n'
+        submissionstring += '# load relion/4.0.0' + '\n'
+        submissionstring += 'echo - e "$(hostname) modules: $(module list 2>&1 | grep relion --color=never)"' + '\n'
+        # Get & write refinement command
+        submissionstring += 'mpirun ' + self.write_refine_command(crossover)
+        # Write submission file
+        submission_file_name = self.date + '_' + co + 'co_submission.sh'
+        submission_file_path = os.path.join(directory, submission_file_name)
+        with open(submission_file_path, 'w') as fout:
+            fout.write(submissionstring)
+        return submission_file_path
+
+    def write_refine_command(self, crossover):
+        # Get values
+        ini_iter = self.settings['inimodel_iter']
+        mask = self.settings['inimodel_mask']
+        shift = self.settings['inimodel_shift']
+        angle = self.settings['inimodel_angle']
+        step = self.settings['inimodel_angle_step']
+        sym = self.settings['inimodel_sym']
+        max_res = self.settings['inimodel_max_res']
+        px_size = self.settings['general_px_size']
+        class_averages = self.settings['general_ca_location']
+        cpus = self.settings['inimodel_cpus']
+        # Build command
+        refine_command = 'relion_helix_inimodel2d ' + '\\\n'
+        refine_command += '--i ' + class_averages + ' \\\n'
+        refine_command += '--o ' + inimodel_name + ' \\\n'
+        refine_command += '--angpix ' + str(px_size) + ' \\\n'
+        refine_command += '--iter ' + str(ini_iter) + ' \\\n'
+        refine_command += '--mask_diameter ' + str(mask) + ' \\\n'
+        refine_command += '--search_shift ' + str(shift) + ' \\\n'
+        refine_command += '--search_angle ' + str(angle) + ' \\\n'
+        refine_command += '--step_angle ' + str(step) + ' \\\n'
+        refine_command += '--sym ' + str(sym) + ' \\\n'
+        refine_command += '--maxres ' + str(max_res) + ' \\\n'
+        refine_command += '--j ' + str(cpus) + ' \n'
+        # Write command into log file of master folder
+        log_file_name = os.path.join(self.refine_runs_master, 'command.log')
+        self.write_file(refine_command, log_file_name)
+        '''
+                # 3D REFINE COMMAND
+                    mpirun `which relion_refine_mpi`\
+                     --o Refine3D/900_3dref_result\
+                     --auto_refine\
+                     --split_random_halves\
+                     --i Select/job043/particles.star\
+                     --ref 220530_crossover_range_4refine/inimodels/bin3/900co_768px_bin3.mrc\
+                     --ini_high 10\
+                     --dont_combine_weights_via_disc\
+                     --pool 30\
+                     --pad 2\
+                     --skip_gridding\
+                     --ctf\
+                     --particle_diameter 220\
+                     --flatten_solvent\
+                     --zero_mask\
+                     --oversampling 1\
+                     --healpix_order 3\
+                     --auto_local_healpix_order 4\
+                     --offset_range 5\
+                     --offset_step 2\
+                     --sym C1\
+                     --low_resol_join_halves 40\
+                     --norm\
+                     --scale\
+                     --helix\
+                     --helical_outer_diameter 180\
+                     --helical_nr_asu 3\
+                     --helical_twist_initial -0.95\
+                     --helical_rise_initial 4.75\
+                     --helical_z_percentage 0.17\
+                     --sigma_tilt 5\
+                     --sigma_psi 3.33333\
+                     --sigma_rot 0\
+                     --helical_keep_tilt_prior_fixed\
+                     --j 8\
+                     --gpu "0:1:2:3"
+                '''
+        return refine_command
+
+    def refine_submit(self):
+        for file in self.refine_submission_file_paths:
+            print("Submitting " + file + " to hpc.")
+            cmd_string = 'sbatch ' + file
+            subprocess.run(cmd_string, shell=True, text=True, check=True)
 
 
 class Job():
     '''
     Job object for archiving job information.
-
-    TODO EVENTUALLY
-    Move inimodel functions of project here.
-    Including all necessary information such as lists of submission files etc.
-
     '''
+
     def __init__(self, label, location, settingsfile, logfile, status='WIP'):
         self.label = label
         self.location = location

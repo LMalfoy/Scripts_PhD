@@ -8,7 +8,7 @@ GOAL
     - DONE Use pandas dataframes as internal structure
 
 USAGE
-    - get dataframe = parser.read("file)
+    - get dataframe = parser.read(file)
     - safe into file = parser.write(dataframe, dictionary)
 '''
 

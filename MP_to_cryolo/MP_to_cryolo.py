@@ -5,7 +5,7 @@ import numpy as np
 '''
 GOAL
     - DONE Read .star file and create internal data structure
-    - Write internal data structures into a .star file
+    - DONE Write internal data structures into a .star file
     - DONE Use pandas dataframes as internal structure
 
 USAGE
@@ -26,6 +26,8 @@ class Star:
         if filename != '':
             self.read()
 
+        self.cryolo_dataframe = self.create_cryolo_dataframe()
+
     def __str__(self):
         print(self.dataframes)
         print(self.dataframe_to_string(self.dataframes[0]))
@@ -42,7 +44,7 @@ class Star:
             self.lines = fin.readlines()
 
     def parse_lines(self):
-        # Parses lines for loops and datapairs
+        # Parses lines for loops
         datablock = []
         in_datablock = False
         for line in self.lines:
@@ -98,7 +100,7 @@ class Star:
         n = v - u
         n /= np.linalg.norm(n, 2)
         point = v - distance * n
-        return list(point)
+        return point
 
     def calculate_coordinates(self, x1, y1, x2, y2, distance):
         coordinates = [(x1, y1)]
@@ -107,14 +109,71 @@ class Star:
         while True:
             new_coord = self.get_next_point(point1[0], point1[1], point2[0], point2[1], distance)
             coordinates.append((new_coord[0], new_coord[1]))
-            point1 = point2
-            point2 = new_coord
+            point1 = new_coord
             if x1 < x2 and new_coord[0] > x2:
                 break
             elif x1 > x2 and new_coord[0] < x2:
                 break
         return coordinates
 
+
+    def create_cryolo_dataframe(self):
+        cryolo_dict = dict()
+        col_names = [
+            'CoordinateX',  # 1
+            'CoordinateY',  # 2
+            'CoordinateZ',  # 3
+            'Width',  # 4
+            'Height',  # 5
+            'Depth',  # 6
+            'EstWidth',  # 7
+            'EstHeight',  # 8
+            'Confidence',  # 9
+            'NumBoxes',  # 10
+            'Angle',  # 11
+            'filamentid'  # 12
+        ]
+        default_values = [
+            'X',
+            'Y',
+            '<NA>',
+            200.0,
+            200.0,
+            1.0,
+            '<NA>',
+            '<NA>',
+            1.0,
+            '<NA>',
+            '<NA>',
+            'FIL_ID'
+        ]
+        relion_df = self.dataframes[0]
+        for col_name in col_names:
+            cryolo_dict[col_name] = []
+        fil_counter = 0
+        for i in range(0, relion_df.shape[0] - 1, 2):
+            x1 = float(relion_df.iloc[i][0])
+            x2 = float(relion_df.iloc[i + 1][0])
+            y1 = float(relion_df.iloc[i][1])
+            y2 = float(relion_df.iloc[i + 1][1])
+            coords = self.calculate_coordinates(x1, y1, x2, y2, 20)
+            for coordinate in coords:
+                x = coordinate[0]
+                y = coordinate[1]
+                for i in range(len(col_names)):
+                    if col_names[i] == 'CoordinateX':
+                        cryolo_dict[col_names[i]].append(x)
+                        continue
+                    if col_names[i] == 'CoordinateY':
+                        cryolo_dict[col_names[i]].append(y)
+                        continue
+                    if col_names[i] == 'filamentid':
+                        cryolo_dict[col_names[i]].append(fil_counter)
+                        continue
+                    cryolo_dict[col_names[i]].append(default_values[i])
+            fil_counter += 1
+        cryolo_dataframe = pd.DataFrame(cryolo_dict)
+        return cryolo_dataframe
 
 if __name__ == '__main__':
     parser = Star(filename='file.star')
@@ -123,8 +182,6 @@ if __name__ == '__main__':
     n2 = 2200
     o2 = 1350
     dist = 20
-    coords = parser.calculate_coordinates(x1=n1, y1=o1, x2=n2, y2=o2, distance=dist)
-    print(coords)
     print(parser)
 
 '''

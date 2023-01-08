@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 
 '''
 GOAL
@@ -79,14 +80,6 @@ class Star:
             df = pd.DataFrame(loop)
             self.dataframes.append(df)
 
-    def datapair_to_string(self):
-        # Converts datapairs into a .star file compatible string
-        sorted_dict = {key: value for key, value in sorted(self.datapairs.items())}
-        tostring = '# data pairs \n'
-        for k, v in sorted_dict.items():
-            tostring += '_{} {}'.format(k, v) + '\n'
-        return tostring
-
     def dataframe_to_string(self, dataframe):
         # Converts dataframe into a .star file compatible string
         # Conversion of dataframe into fragments
@@ -97,10 +90,61 @@ class Star:
         tostring += dataframe.to_string(index=False, header=False)
         return tostring
 
+    def get_next_point(self, x1, y1, x2, y2, distance):
+        point1 = (x1, y1)
+        point2 = (x2, y2)
+        v = np.array(point1, dtype=float)
+        u = np.array(point2, dtype=float)
+        n = v - u
+        n /= np.linalg.norm(n, 2)
+        point = v - distance * n
+        return list(point)
+
+    def calculate_coordinates(self, x1, y1, x2, y2, distance):
+        coordinates = [(x1, y1)]
+        point1 = [x1, y1]
+        point2 = [x2, y2]
+        while True:
+            new_coord = self.get_next_point(point1[0], point1[1], point2[0], point2[1], distance)
+            coordinates.append((new_coord[0], new_coord[1]))
+            point1 = point2
+            point2 = new_coord
+            if x1 < x2 and new_coord[0] > x2:
+                break
+            elif x1 > x2 and new_coord[0] < x2:
+                break
+        return coordinates
+
+
 if __name__ == '__main__':
     parser = Star(filename='file.star')
+    n1 = 2000
+    o1 = 1300
+    n2 = 2200
+    o2 = 1350
+    dist = 20
+    coords = parser.calculate_coordinates(x1=n1, y1=o1, x2=n2, y2=o2, distance=dist)
+    print(coords)
     print(parser)
 
+'''
+loop_
+_CoordinateX #1
+_CoordinateY #2
+_CoordinateZ #3
+_Width #4
+_Height #5
+_Depth #6
+_EstWidth #7
+_EstHeight #8
+_Confidence #9
+_NumBoxes #10
+_Angle #11
+_filamentid #12
+2007.949547581903 1354.634352574103 <NA> 200.0 200.0 1.0 <NA> <NA> 1.0 <NA> <NA> 0.0
+2023.0496459858393 1368.3188167526703 <NA> 200.0 200.0 1.0 <NA> <NA> 1.0 <NA> <NA> 0.0
+
+'''
 
 
 

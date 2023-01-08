@@ -509,6 +509,7 @@ class Project:
         inimodel_command += '--i ' + class_averages + ' \\\n'
         inimodel_command += '--o ' + inimodel_name + ' \\\n'
         inimodel_command += '--angpix ' + str(px_size) + ' \\\n'
+        inimodel_command += '--crossover_distance ' + str(crossover) + ' \\\n'
         inimodel_command += '--iter ' + str(ini_iter) + ' \\\n'
         inimodel_command += '--mask_diameter ' + str(mask) + ' \\\n'
         inimodel_command += '--search_shift ' + str(shift) + ' \\\n'

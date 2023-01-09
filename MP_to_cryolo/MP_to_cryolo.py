@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+import glob
 
 '''
 GOAL
@@ -9,8 +10,10 @@ GOAL
     - DONE Use pandas dataframes as internal structure
 
 USAGE
-    - get dataframe = parser.read(file)
-    - safe into file = parser.write(dataframe, dictionary)
+    - Copy script into folder containing relion Manualpicked fibril coordinates
+    - Run with python3
+    - May have to rename files (.cbox file extension only added at the end, .star extension 
+    might throw off image detection).
 '''
 
 
@@ -27,6 +30,7 @@ class Star:
             self.read()
 
         self.cryolo_dataframe = self.create_cryolo_dataframe()
+        self.write_cryolo_dataframe()
 
     def __str__(self):
         print(self.dataframes)
@@ -86,10 +90,12 @@ class Star:
         # Converts dataframe into a .star file compatible string
         # Conversion of dataframe into fragments
         columns = [*dataframe]
-        tostring = 'loop_' + '\n'
+        tostring = ''
+        tostring = 'data_global\n\n_cbox_format_version 1.0\n\ndata_cryolo\n\nloop_' + '\n'
         for colname in columns:
             tostring += '_' + colname + '\n'
         tostring += dataframe.to_string(index=False, header=False)
+        tostring += '\n\ndata_cryolo_include\n\nloop_\n_slice_index #1\n\n'
         return tostring
 
     def get_next_point(self, x1, y1, x2, y2, distance):
@@ -103,6 +109,7 @@ class Star:
         return point
 
     def calculate_coordinates(self, x1, y1, x2, y2, distance):
+        print("Calculating coordinates..")
         coordinates = [(x1, y1)]
         point1 = [x1, y1]
         point2 = [x2, y2]
@@ -114,6 +121,11 @@ class Star:
                 break
             elif x1 > x2 and new_coord[0] < x2:
                 break
+            if y1 < y2 and new_coord[1] > y2:
+                break
+            elif y1 > y2 and new_coord[1] < y2:
+                break
+        print("Done.")
         return coordinates
 
 
@@ -175,33 +187,15 @@ class Star:
         cryolo_dataframe = pd.DataFrame(cryolo_dict)
         return cryolo_dataframe
 
+    def write_cryolo_dataframe(self):
+        print("Writing file..")
+        outfile = self.filename + '.cbox'
+        outstring = self.dataframe_to_string(self.cryolo_dataframe)
+        with open(outfile, 'w') as fout:
+            fout.write(outstring)
+            print("Done.")
+
 if __name__ == '__main__':
-    parser = Star(filename='file.star')
-    n1 = 2000
-    o1 = 1300
-    n2 = 2200
-    o2 = 1350
-    dist = 20
-    print(parser)
-
-'''
-loop_
-_CoordinateX #1
-_CoordinateY #2
-_CoordinateZ #3
-_Width #4
-_Height #5
-_Depth #6
-_EstWidth #7
-_EstHeight #8
-_Confidence #9
-_NumBoxes #10
-_Angle #11
-_filamentid #12
-2007.949547581903 1354.634352574103 <NA> 200.0 200.0 1.0 <NA> <NA> 1.0 <NA> <NA> 0.0
-2023.0496459858393 1368.3188167526703 <NA> 200.0 200.0 1.0 <NA> <NA> 1.0 <NA> <NA> 0.0
-
-'''
-
-
-
+    for file in glob.glob("*.star"):
+        print(file)
+        parser = Star(filename=file)

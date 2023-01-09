@@ -20,16 +20,18 @@ USAGE
 class Star:
 
     def __init__(self, filename=''):
+        # Initialize parser
         self.lines = list()
         self.datablocks = list()
         self.datapairs = dict()
         self.filename = filename
         self.dataframes = list()
-
+        # Read .star file
         if filename != '':
             self.read()
-
+        # Create cryolo compatible dataframe, including calculation of individual segment coordinates.
         self.cryolo_dataframe = self.create_cryolo_dataframe()
+        # Write out .cbox file compatible with cryolo
         self.write_cryolo_dataframe()
 
     def __str__(self):
@@ -38,6 +40,7 @@ class Star:
         return ':)'
 
     def read(self):
+        # Reads rln star file and saves coordinates (and other, useless data) into an internal dataframe.
         self.read_file(self.filename)
         self.parse_lines()
         self.parse_datablocks()
@@ -99,6 +102,9 @@ class Star:
         return tostring
 
     def get_next_point(self, x1, y1, x2, y2, distance):
+        # Calculates next point given p1 and p2 connected via straight line. Next point is distance distance
+        # away from point1. Calculates directional vector connecting two points, then normalizes to unit vector
+        # and calculates point based on distance * unit vector starting at p1.
         point1 = (x1, y1)
         point2 = (x2, y2)
         v = np.array(point1, dtype=float)
@@ -109,6 +115,8 @@ class Star:
         return point
 
     def calculate_coordinates(self, x1, y1, x2, y2, distance):
+        # Calculates points along a line (filament) with a distance "distance" from first point x1, y1 given
+        # a second point x2, y2.
         print("Calculating coordinates..")
         coordinates = [(x1, y1)]
         point1 = [x1, y1]
@@ -130,6 +138,9 @@ class Star:
 
 
     def create_cryolo_dataframe(self):
+        # Creates dataframe containing columns and default values for cryolo filament coordinates.
+        # Converts pairs of relion filament coordinates (START-END) to individual particle coordinates.
+        # Control distance between individual filament segments with distance parameter (set to 20 px).
         cryolo_dict = dict()
         col_names = [
             'CoordinateX',  # 1
@@ -168,7 +179,8 @@ class Star:
             x2 = float(relion_df.iloc[i + 1][0])
             y1 = float(relion_df.iloc[i][1])
             y2 = float(relion_df.iloc[i + 1][1])
-            coords = self.calculate_coordinates(x1, y1, x2, y2, 20)
+            # Distance set to 20 px
+            coords = self.calculate_coordinates(x1, y1, x2, y2, distance=20)
             for coordinate in coords:
                 x = coordinate[0]
                 y = coordinate[1]
@@ -188,6 +200,7 @@ class Star:
         return cryolo_dataframe
 
     def write_cryolo_dataframe(self):
+        # Writes cryolo dataframe into a .cbox file, compatible with cryolo's training algorithm
         print("Writing file..")
         outfile = self.filename + '.cbox'
         outstring = self.dataframe_to_string(self.cryolo_dataframe)

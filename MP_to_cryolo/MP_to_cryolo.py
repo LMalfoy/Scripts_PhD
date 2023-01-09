@@ -29,6 +29,8 @@ class Star:
         # Read .star file
         if filename != '':
             self.read()
+        # Set intersegment distance to 20 px
+        self.distance = 20
         # Create cryolo compatible dataframe, including calculation of individual segment coordinates.
         self.cryolo_dataframe = self.create_cryolo_dataframe()
         # Write out .cbox file compatible with cryolo
@@ -180,7 +182,7 @@ class Star:
             y1 = float(relion_df.iloc[i][1])
             y2 = float(relion_df.iloc[i + 1][1])
             # Distance set to 20 px
-            coords = self.calculate_coordinates(x1, y1, x2, y2, distance=20)
+            coords = self.calculate_coordinates(x1, y1, x2, y2, distance=self.distance)
             for coordinate in coords:
                 x = coordinate[0]
                 y = coordinate[1]

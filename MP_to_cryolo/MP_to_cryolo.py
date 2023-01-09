@@ -204,7 +204,7 @@ class Star:
     def write_cryolo_dataframe(self):
         # Writes cryolo dataframe into a .cbox file, compatible with cryolo's training algorithm
         print("Writing file..")
-        outfile = self.filename + '.cbox'
+        outfile = self.filename.split('.')[0] + '.cbox'
         outstring = self.dataframe_to_string(self.cryolo_dataframe)
         with open(outfile, 'w') as fout:
             fout.write(outstring)

@@ -11,9 +11,9 @@ GOAL
 
 USAGE
     - Copy script into folder containing relion Manualpicked fibril coordinates
-    - Run with python3
-    - May have to rename files (.cbox file extension only added at the end, .star extension 
-    might throw off image detection).
+    - Run with python3: python3 MP_to_cryolo.py ./*star
+    - Will output *.cbox files, that can be used to train cryolo networks in fibrillar mode
+
 '''
 
 

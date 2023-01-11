@@ -31,6 +31,9 @@ class Star:
             self.read()
         # Set intersegment distance to 20 px
         self.distance = 20
+        # Set box size to 200
+        self.width = 200.0
+        self.height = 200.0
         # Create cryolo compatible dataframe, including calculation of individual segment coordinates.
         self.cryolo_dataframe = self.create_cryolo_dataframe()
         # Write out .cbox file compatible with cryolo
@@ -162,8 +165,8 @@ class Star:
             'X',
             'Y',
             '<NA>',
-            200.0,
-            200.0,
+            self.width,
+            self.height,
             1.0,
             '<NA>',
             '<NA>',
@@ -184,8 +187,10 @@ class Star:
             # Distance set to 20 px
             coords = self.calculate_coordinates(x1, y1, x2, y2, distance=self.distance)
             for coordinate in coords:
-                x = coordinate[0]
-                y = coordinate[1]
+                # CBOX files do not save coordinates as center of the image, but as bottom left corner of image!!
+                # Thats why I need to substract from the image coordinate half of the box size in X and Y!!
+                x = coordinate[0] - (self.width / 2)
+                y = coordinate[1] - (self.height / 2)
                 for i in range(len(col_names)):
                     if col_names[i] == 'CoordinateX':
                         cryolo_dict[col_names[i]].append(x)
